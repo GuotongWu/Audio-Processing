@@ -1,0 +1,13 @@
+.vscode
+.idea
+
+*.pyc
+
+*.wav
+*.m4a
+*.mp3
+
+*.zip
+*.pkl
+
+test.py
