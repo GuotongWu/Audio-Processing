@@ -11,7 +11,7 @@ papers
 *.mp3
 
 *.zip
-*.pkl
+*.pklgit 
 
 test.py
 test.ipynb
