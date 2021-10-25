@@ -1,53 +1,63 @@
-#-*-coding:utf-8-*-
-
-import matplotlib.pyplot as plt
-import pywt
-import math
+import librosa
 import numpy as np
+from skimage.restoration import denoise_wavelet
+import matplotlib.pyplot as plt
+import soundfile as sf
 
-#get Data
-ecg=pywt.data.ecg()  #生成心电信号
-index=[]
-data=[]
-coffs=[]
+def read_audio():
+    audio_data = {
+        'denoise': [],
+        'feature': [],
+        'label': [], #(sentence, person)
+    }
+    pre_data = []
+    for person in range(3):
+        for times in range(10):
+            for sentence in range(9):
+                y, sr = librosa.load('./src/'+str(person)+'-'+str(times)+'-'+str(sentence)+'.wav')
+                # pre_data.append(DenoisingAudio(y, sr))
+                pre_data.append(y)
+                audio_data['label'].append((sentence, person))
+                audio_data['denoise'].append(DenoisingAudio(y, sr))
+    for y in pre_data:
+        audio_data['feature'].append(librosa.feature.mfcc(y))
+    return audio_data, sr
 
-for i in range(len(ecg)-1):
-    X=float(i)
-    Y=float(ecg[i])
-    index.append(X)
-    data.append(Y)
-#create wavelet object and define parameters
-w=pywt.Wavelet('db8')#选用Daubechies8小波
-maxlev=pywt.dwt_max_level(len(data),w.dec_len)
-print("maximum level is"+str(maxlev))
-threshold=0  #Threshold for filtering
 
-#Decompose into wavelet components,to the level selected:
-coffs=pywt.wavedec(data,'db8',level=maxlev) #将信号进行小波分解
+def DenoisingAudio(y, sr):
+    # Fs, x = wavfile.read(flute.wav)  # Reading Audio Wave File
+    y = y / max(y)  # Normalizing Amplitude
 
-for i in range(1,len(coffs)):
-    coffs[i]=pywt.threshold(coffs[i],threshold*max(coffs[i]))
+    sigma = 0.05  # Noise Variance
+    # print(np.random.randn(y.size))
+    # y_noisy = y
+    y_noisy = y + sigma * np.random.randn(y.size)  # Adding Noise to Signal
 
-datarec=pywt.waverec(coffs,'db8')#将信号进行小波重构
+    # Wavelet Denoising
+    y_denoise = denoise_wavelet(y_noisy, method='BayesShrink', mode='soft', wavelet_levels=3, wavelet='haar',rescale_sigma=True)
 
-mintime=0
-maxtime=mintime+len(data) 
-print(mintime,maxtime)
+    # plt.figure(figsize=(10, 5), dpi=100)
+    plt.plot(y_noisy)
+    plt.plot(y_denoise)
 
-plt.figure()
-plt.subplot(3,1,1)
-plt.plot(index[mintime:maxtime], data[mintime:maxtime])
-plt.xlabel('time (s)')
-plt.ylabel('microvolts (uV)')
-plt.title("Raw signal")
-plt.subplot(3, 1, 2)
-plt.plot(index[mintime:maxtime], datarec[mintime:maxtime])
-plt.xlabel('time (s)')
-plt.ylabel('microvolts (uV)')
-plt.title("De-noised signal using wavelet techniques")
-plt.subplot(3, 1, 3)
-plt.plot(index[mintime:maxtime],data[mintime:maxtime]-datarec[mintime:maxtime])
-plt.xlabel('time (s)')
-plt.ylabel('error (uV)')
-plt.tight_layout()
-plt.show()
+    sf.write('./src/denoise/test_noisy.wav', np.array(y_noisy,dtype=np.float32), sr)
+    sf.write('./src/denoise/test_denoisy.wav', np.array(y_denoise,dtype=np.float32), sr)
+
+    # plt.legend([signal1, signal2], loc='best', labels=[y_noisy, y_denoise])
+    # plt.show()
+    return y_noisy, y_denoise
+
+def audio_output(audio_data, sr):
+    # print(len(audio_data['denoise']))
+    for each_audio in audio_data.items():
+        # print('\n' + each_audio[0])
+        for person in range(3):
+            for times in range(10):
+                for sentence in range(9):
+                    sf.write('./src/denoise/'+str(person)+'-'+str(times)+'-'+str(sentence)+'.wav', np.array(each_audio[1][person+times+sentence],dtype=np.float32), sr)
+                    # sf.write('stereo_file1.wav', each_audio[0], 48000)
+
+
+if __name__ == '__main__':
+    audio_data, sr = read_audio()
+    audio_output(audio_data, sr)
