@@ -89,39 +89,42 @@ class Net(nn.Module):
         x = x.reshape((-1, 1, 114, 100))
         return self.Sequence(x)
 
-device = 0
-lr = 0.0001
-epoch = 1000
-net = Net().to(device=device)
+
+if __name__ == '__main__':
+    device = 0
+    lr = 0.0001
+    epoch = 1000
+    batch_size = 16
+    net = Net().to(device=device)
 
 
-optimiser = torch.optim.Adam(net.parameters(), lr=lr)
-loss_func = torch.nn.CrossEntropyLoss()
+    optimiser = torch.optim.Adam(net.parameters(), lr=lr)
+    loss_func = torch.nn.CrossEntropyLoss()
 
-dataset = AudioDataset('audio.pkl')
-loader = DataLoader(dataset=dataset, batch_size=16, shuffle=True, num_workers=0)
+    dataset = AudioDataset('audio.pkl')
+    loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
-for _ in range(epoch):
+    for _ in range(epoch):
+        for x, y in loader:
+            x, y = x.to(device=device), y.to(device=device)
+            y_ = net(x)
+            loss = loss_func(y_, y)
+            optimiser.zero_grad()
+            loss.backward()
+            optimiser.step()
+        print(_, '|' ,epoch,"  " ,(y_.argmax(dim=1) == y).to(torch.float32).mean())
+
+            
+    dataset = AudioTestDataset('audio.pkl')
+    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=0)
+
+    alls = 0
+    correct = 0
     for x, y in loader:
+        alls += 1
         x, y = x.to(device=device), y.to(device=device)
         y_ = net(x)
-        loss = loss_func(y_, y)
-        optimiser.zero_grad()
-        loss.backward()
-        optimiser.step()
-    print(_, '|' ,epoch,"  " ,(y_.argmax(dim=1) == y).to(torch.float32).mean())
-
-        
-dataset = AudioTestDataset('audio.pkl')
-loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=0)
-
-alls = 0
-correct = 0
-for x, y in loader:
-    alls += 1
-    x, y = x.to(device=device), y.to(device=device)
-    y_ = net(x)
-    print(y_.argmax().item(), y.item())
-    if(y_.argmax().item() == y.item()):
-        correct += 1
-print(correct / alls)
+        print(y_.argmax().item(), y.item())
+        if(y_.argmax().item() == y.item()):
+            correct += 1
+    print(correct / alls)

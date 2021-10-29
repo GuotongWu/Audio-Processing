@@ -1,8 +1,8 @@
-#import auditok 语音切割包
+import auditok
 import os
 import json
 
-person = json.load(open('meta.json', 'r', encoding = 'utf-8'))['person']
+person = json.load(open('./src/meta.json', 'r', encoding = 'utf-8'))['person']
 # remember to renew meta.json for person name
 
 def separate(filename:str, personid:int, sampleid:int):
@@ -26,6 +26,6 @@ def separate(filename:str, personid:int, sampleid:int):
         # region's metadata can also be used with the `save` method
         # (no need to explicitly specify region's object and `format` arguments)
 
-name = 'wgt'
+name = 'siri-female'
 for i, item in enumerate(os.listdir(name)):
     separate('%s/%s' % (name, item), person[name], i)
