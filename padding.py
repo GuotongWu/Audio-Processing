@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pickle as pkl
 from librosa.feature.spectral import mfcc
 from mpl_toolkits.mplot3d import Axes3D
+import os
 
 def padding(audio_data, padding_len=291500):
     padding_data = []
@@ -13,18 +14,24 @@ def padding(audio_data, padding_len=291500):
         padding_data.append(np.hstack((np.zeros(zero_len), y, np.zeros(padding_len-zero_len-len(y)))))
     return padding_data
 
-def read_audio():
+def read_audio(path:str):
     audio_data = {
         'feature': [],
         'label': [], #(sentence, person)
     }
     pre_data = []
-    for person in range(3):
-        for times in range(10):
-            for sentence in range(9):
-                y, _ = librosa.load('./src/'+str(person)+'-'+str(times)+'-'+str(sentence)+'.wav')
-                pre_data.append(y)
-                audio_data['label'].append((sentence, person))   
+
+    for item in os.listdir(path):
+        person, times, sentence = [int(i) for i in item.split('.')[0].split('-')]
+        y, _ = librosa.load(os.path.join(path, item))
+        pre_data.append(y)
+        audio_data['label'].append((sentence, person))   
+    # for person in range(3):
+    #     for times in range(10):
+    #         for sentence in range(9):
+    #             y, _ = librosa.load('./src/'+str(person)+'-'+str(times)+'-'+str(sentence)+'.wav')
+    #             pre_data.append(y)
+    #             audio_data['label'].append((sentence, person))   
     pre_data = padding(pre_data)
     for y in pre_data:
         audio_data['feature'].append(librosa.feature.mfcc(y))
@@ -45,11 +52,11 @@ def draw_feature(audio_data):
     xy[1] = list(range(20))*50
 
     # print(audio_data['feature'][0][:, :100].reshape((-1,)))
-    ax.scatter3D(xy[0], xy[1], audio_data['feature'][0][:, 270:320].reshape((-1,)))
-    plt.show()
+    # ax.scatter3D(xy[0], xy[1], audio_data['feature'][0][:, 270:320].reshape((-1,)))
+    # plt.show()
 
- 
+
 if __name__ == '__main__':
-    audio_data = read_audio()
-    save_obj(audio_data, './src/audio')
-    draw_feature(audio_data)
+    audio_data = read_audio('./test')
+    save_obj(audio_data, './test')
+    # draw_feature(audio_data)

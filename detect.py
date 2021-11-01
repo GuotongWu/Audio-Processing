@@ -7,12 +7,12 @@ from dp import *
 device = 0
 lr = 0.0001
 epoch = 1000
-batch_size = 8
+batch_size = 1
 net = Net()
 
 
 
-testDataset = AudioTestDataset('./siri-female.pkl')
+testDataset = AudioTestDataset('./audio.pkl')
 testLoader = DataLoader(testDataset, batch_size=batch_size)
 net.load_state_dict(torch.load('./netcpu.pt'))
 net = net.to(device=device)

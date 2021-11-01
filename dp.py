@@ -41,6 +41,8 @@ class Net(nn.Module):
         # (1, 114, 100)
         self.Conv0 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, stride=1, padding=1)
 
+        self.BatchNorm0 = nn.BatchNorm2d(num_features=8)
+
         self.ReLU0 = nn.ReLU()
 
         # (8, 57, 50)
@@ -48,6 +50,8 @@ class Net(nn.Module):
 
         # (32, 20, 18)
         self.Conv1 = nn.Conv2d(in_channels=8, out_channels=32, kernel_size=5, stride=3, padding=3)
+
+        self.BatchNorm1 = nn.BatchNorm2d(num_features=32)
 
         self.ReLU1 = nn.ReLU()
 
@@ -70,9 +74,11 @@ class Net(nn.Module):
 
         self.Sequence = nn.Sequential(
             self.Conv0,
+            self.BatchNorm0,
             self.ReLU0,
             self.Pooling0,
             self.Conv1,
+            self.BatchNorm1,
             self.ReLU1,
             self.Pooling1,
             self.Flatten,
@@ -93,12 +99,14 @@ class Net(nn.Module):
 if __name__ == '__main__':
     device = 0
     lr = 0.0001
-    epoch = 1000
+    epoch = 200
     batch_size = 16
+    regulation_lambda = 0.001
     net = Net().to(device=device)
 
 
     optimiser = torch.optim.Adam(net.parameters(), lr=lr)
+    
     loss_func = torch.nn.CrossEntropyLoss()
 
     dataset = AudioDataset('audio.pkl')
@@ -108,14 +116,19 @@ if __name__ == '__main__':
         for x, y in loader:
             x, y = x.to(device=device), y.to(device=device)
             y_ = net(x)
-            loss = loss_func(y_, y)
+
+            loss_reg = torch.tensor([0.0]).to(device=device)
+            for para in net.parameters():
+                loss_reg += torch.sum(para**2) * regulation_lambda
+
+            loss = loss_func(y_, y) + loss_reg
             optimiser.zero_grad()
             loss.backward()
             optimiser.step()
-        print(_, '|' ,epoch,"  " ,(y_.argmax(dim=1) == y).to(torch.float32).mean())
+            print(_, '|' ,epoch,"  " ,(y_.argmax(dim=1) == y).to(torch.float32).mean())
 
             
-    dataset = AudioTestDataset('audio.pkl')
+    dataset = AudioTestDataset('test.pkl')
     loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=0)
 
     alls = 0

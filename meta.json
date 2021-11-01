@@ -4,7 +4,9 @@
         "yzh": 0,
         "zyp": 1,
         "wgt": 2,
-        "siri-female": 3
+        "siri-female": 3,
+        "szw": 4,
+        "ly": 5
     },
 
     "command":{
