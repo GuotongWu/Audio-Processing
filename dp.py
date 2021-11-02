@@ -11,7 +11,7 @@ class AudioDataset(Dataset):
             data = pickle.load(f)
         self.raw_x = data['feature'][:-70]
         self.raw_y = data['label'][:-70]
-            
+
     def __len__(self):
         return len(self.raw_x)
         
