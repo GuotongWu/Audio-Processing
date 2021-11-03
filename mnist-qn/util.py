@@ -68,9 +68,9 @@ class EnvelopDataset(Dataset):
         self.file_list = os.listdir(dir)
         self.locator = PostIDLocator(threshold=threshold, shrink=shrink)
         self.transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize((28, 28)),
             torchvision.transforms.Grayscale(num_output_channels=1),
             Binarify(threshold=0.5),
+            torchvision.transforms.Resize((32, 32)),
             torchvision.transforms.ToTensor()
         ])
 
@@ -83,110 +83,50 @@ class EnvelopDataset(Dataset):
         points = self.locator.locate(cv2.imread(path))
         return torch.stack([self.transform(im.crop(item)) for item in points]), path
 
-'''
-
-class ConvNet_(torch.nn.Module):
-    def __init__(self):
-        super(ConvNet, self).__init__()
-        self.Sequence = torch.nn.Sequential(
-            # (1, 28, 28)
-            torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, stride=1, padding=2),
-
-            torch.nn.BatchNorm2d(num_features=32),
-
-            # (32, 28, 28)
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
-
-            # (32, 14, 14)
-            torch.nn.ReLU(),
-
-            # (32, 14, 14)
-            torch.nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, stride=1, padding=2),
-            
-
-            torch.nn.BatchNorm2d(num_features=64),
-
-            # (64, 14, 14)
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
-
-            # (64, 7, 7)
-            torch.nn.ReLU(),
-
-            # (64, 7, 7)
-            torch.nn.Flatten(start_dim=1),
-
-            # (64 * 7 * 7 = 3136)
-            torch.nn.Linear(in_features=3136, out_features=1024),
-
-            # (1024, )
-            torch.nn.ReLU(),
-
-            # (1024, )
-            torch.nn.Linear(in_features=1024, out_features=10),
-
-            # (10, )
-            torch.nn.Softmax(),
-        )
-        
-
-    def forward(self, x):
-        return self.Sequence(x)
-
-'''
-
 
 class ConvNet(torch.nn.Module):
     def __init__(self):
         super(ConvNet, self).__init__()
         self.Sequence = torch.nn.Sequential(
-            torch.nn.BatchNorm2d(num_features=1),
-            
-            # (1, 28, 28)
+            # (1, 32, 32)
             torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, stride=1, padding=2),
 
             torch.nn.BatchNorm2d(num_features=32),
 
-            # (32, 28, 28)
+            # (32, 32, 32)
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            
-            torch.nn.Dropout2d(p=0.25),
 
-            
-            # (32, 14, 14)
+            # (32, 16, 16)
             torch.nn.ReLU(),
 
-            # (32, 14, 14)
+            # (32, 16, 16)
             torch.nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, stride=1, padding=2),
             
 
             torch.nn.BatchNorm2d(num_features=64),
 
-            # (64, 14, 14)
+            # (64, 16, 16)
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            
-            torch.nn.Dropout2d(p=0.25),
 
-            
-            # (64, 7, 7)
+            # (64, 8, 8)
             torch.nn.ReLU(),
 
-            # (64, 7, 7)
+            # (64, 8, 8)
             torch.nn.Flatten(start_dim=1),
 
-            # (64 * 7 * 7 = 3136)
-            torch.nn.Linear(in_features=3136, out_features=1024),
-            
-            
-            torch.nn.Dropout(p=0.25),
-
+            # (64 * 8 * 8 = 4096)
+            torch.nn.Linear(in_features=4096, out_features=1024),
 
             # (1024, )
             torch.nn.ReLU(),
 
             # (1024, )
-            torch.nn.Linear(in_features=1024, out_features=10),
+            torch.nn.Linear(in_features=1024, out_features=128),
+
+            torch.nn.ReLU(),
+
+            # (128, )
+            torch.nn.Linear(in_features=128, out_features=10),
 
             # (10, )
             torch.nn.Softmax(),
