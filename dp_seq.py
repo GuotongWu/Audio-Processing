@@ -53,7 +53,7 @@ class NetBlock(nn.Module):
         self.multihead_attention = torch.nn.MultiheadAttention(
             embed_dim=self.in_channels,
             num_heads=self.heads_num,
-            batch_first=True
+            # batch_first=True
         )
 
         self.layernorm1 = torch.nn.LayerNorm(normalized_shape=self.in_channels)
@@ -98,7 +98,7 @@ class Net(torch.nn.Module):
         self.block_num = block_num
 
         self.cls_token = torch.nn.Parameter(torch.rand(1, 1, self.in_channels))
-        self.positional_embedding = torch.nn.Parameter(torch.rand(1, self.seq_len + 1, self.in_channels))
+        # self.positional_embedding = torch.nn.Parameter(torch.rand(1, self.seq_len + 1, self.in_channels))
         self.block_list = torch.nn.Sequential(*[
             NetBlock(
                 in_channels=self.in_channels,
@@ -118,7 +118,7 @@ class Net(torch.nn.Module):
         cls_token = self.cls_token.expand(x.shape[0], 1, self.in_channels)
         x = torch.cat((cls_token, x), dim=1)
 
-        x = x + self.positional_embedding
+        # x = x + self.positional_embedding
 
         x = self.block_list(x)
         x = self.layernorm(x)
@@ -130,15 +130,15 @@ class Net(torch.nn.Module):
 
 if __name__ == '__main__':
     device = 0
-    lr = 0.0001
+    lr = 0.1
     epoch = 200
-    batch_size = 16
-    regulation_lambda = 0.001
+    batch_size = 1
+    regulation_lambda = 0.0000000001
     net = Net().to(device=device)
     losses = []
 
 
-    optimiser = torch.optim.Adam(net.parameters(), lr=lr)
+    optimiser = torch.optim.SGD(net.parameters(), lr=lr)
     
     loss_func = torch.nn.CrossEntropyLoss()
 
