@@ -53,7 +53,7 @@ class NetBlock(nn.Module):
         self.multihead_attention = torch.nn.MultiheadAttention(
             embed_dim=self.in_channels,
             num_heads=self.heads_num,
-            batch_first=True
+            # batch_first=True
         )
 
         self.layernorm1 = torch.nn.LayerNorm(normalized_shape=self.in_channels)
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     losses = []
     corrects = []
 
-    optimiser = torch.optim.Adam(net.parameters(), lr=lr)
+    optimiser = torch.optim.SGD(net.parameters(), lr=lr)
     
     loss_func = torch.nn.CrossEntropyLoss()
 
