@@ -89,7 +89,7 @@ class NetBlock(nn.Module):
 
 
 class Net(torch.nn.Module):
-    def __init__(self, in_channels:int=20, seq_len:int=570, heads_num:int=4, hidden_nodes:int=1024, block_num:int=12):
+    def __init__(self, in_channels:int=20, seq_len:int=64, heads_num:int=4, hidden_nodes:int=1024, block_num:int=12):
         super().__init__()
         self.in_channels = in_channels
         self.heads_num = heads_num
@@ -98,7 +98,7 @@ class Net(torch.nn.Module):
         self.block_num = block_num
 
         self.cls_token = torch.nn.Parameter(torch.rand(1, 1, self.in_channels))
-        # self.positional_embedding = torch.nn.Parameter(torch.rand(1, self.seq_len + 1, self.in_channels))
+        self.positional_embedding = torch.nn.Parameter(torch.rand(1, self.seq_len + 1, self.in_channels))
         self.layernorm_in = torch.nn.LayerNorm(normalized_shape=self.in_channels)
         self.block_list = torch.nn.Sequential(*[
             NetBlock(
@@ -120,7 +120,7 @@ class Net(torch.nn.Module):
         cls_token = self.cls_token.expand(x.shape[0], 1, self.in_channels)
         x = torch.cat((cls_token, x), dim=1)
 
-        # x = x + self.positional_embedding
+        x = x + self.positional_embedding[:, :x.shape[1], :]
 
         x = self.block_list(x)
         x = self.layernorm(x)
@@ -144,10 +144,15 @@ if __name__ == '__main__':
     
     loss_func = torch.nn.CrossEntropyLoss()
 
-    dataset = AudioDataset('audio.pkl')
+    dataset = AudioDataset('./pkl/all_train_nopadding.pkl')
     loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
+    test_dataset = AudioTestDataset('./pkl/all_test_nopadding.pkl')
+    test_loader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False, num_workers=0)
+
+
     for _ in range(epoch):
+        net.train()
         loss_in_epoch = np.array([])
         correct_in_epoch = np.array([])
         for x, y in loader:
@@ -169,19 +174,22 @@ if __name__ == '__main__':
         corrects.append(correct_in_epoch.mean().item())
         print(_ , '|' ,epoch,"  " ,losses[-1], corrects[-1])
 
+        if _ % 10 == 0:
+            net.eval()
+            with torch.no_grad():
+                alls = 0
+                correct = 0
+                for x, y in test_loader:
+                    alls += 1
+                    x, y = x.to(device=device), y.to(device=device)
+                    y_ = net(x)
+                    print(y_.argmax().item(), y.item())
+                    if(y_.argmax().item() == y.item()):
+                        correct += 1
+                print(correct / alls)
+
     plt.plot(list(range(len(losses))), losses)
     plt.show()
 
-    dataset = AudioTestDataset('test.pkl')
-    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=0)
-
-    alls = 0
-    correct = 0
-    for x, y in loader:
-        alls += 1
-        x, y = x.to(device=device), y.to(device=device)
-        y_ = net(x)
-        print(y_.argmax().item(), y.item())
-        if(y_.argmax().item() == y.item()):
-            correct += 1
-    print(correct / alls)
+    
+    

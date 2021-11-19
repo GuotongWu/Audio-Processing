@@ -41,20 +41,20 @@ class AudioTestDataset(Dataset):
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        # (1, 20, 52)
+        # (1, 40, 32)
         self.Conv0 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, stride=1, padding=1)
         self.BatchNorm0 = nn.BatchNorm2d(num_features=8)
         self.ReLU0 = nn.ReLU()
-        self.Pooling0 = nn.MaxPool2d(kernel_size=2, stride=2)  # (8, 10, 26)
+        self.Pooling0 = nn.MaxPool2d(kernel_size=2, stride=2)  # (8, 20, 16)
 
         self.Conv1 = nn.Conv2d(in_channels=8, out_channels=32, kernel_size=3, stride=1, padding=1)
         self.BatchNorm1 = nn.BatchNorm2d(num_features=32)
         self.ReLU1 = nn.ReLU()
-        self.Pooling1 = nn.MaxPool2d(kernel_size=2, stride=2)  # (32, 5, 13)
+        self.Pooling1 = nn.MaxPool2d(kernel_size=2, stride=2)  # (32, 10, 8)
 
         self.Flatten = nn.Flatten(start_dim=1, end_dim=-1)
 
-        self.FC0 = nn.Linear(in_features=32*5*13, out_features=256)
+        self.FC0 = nn.Linear(in_features=32*10*8, out_features=256)
         self.ReLU_0 = nn.ReLU()
 
         self.FC1 = nn.Linear(in_features=256, out_features=64)
@@ -84,6 +84,7 @@ class Net(nn.Module):
         self.lossfunc = torch.nn.CrossEntropyLoss()
 
     def forward(self, x:torch.Tensor):
+        x = x.reshape((-1, 1, 40, 32))
         return self.Sequence(x)
 
     def cal_loss(self, pred, y, regulation_lambda):
@@ -111,19 +112,20 @@ if __name__ == '__main__':
     device = 0
     lr = 0.0001
     epoch = 5000
-    batch_size = 8
+    batch_size = 16
     regulation_lambda = 0.0001
     early_stop = 500
 
+    
     net = Net().to(device=device)
 
     optimiser = torch.optim.Adam(net.parameters(), lr=lr) 
 
-    shuffle_indices = indices = np.arange(279)
+    shuffle_indices = indices = np.arange(441)
     np.random.shuffle(indices)
 
-    train_dataset = AudioDataset('train_padding.pkl', 'train', shuffle_indices)
-    dev_dataset = AudioDataset('train_padding.pkl', 'dev', shuffle_indices)
+    train_dataset = AudioDataset('./pkl/all_train_padding.pkl', 'train', shuffle_indices)
+    dev_dataset = AudioDataset('./pkl/all_train_padding.pkl', 'dev', shuffle_indices)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     dev_loader = DataLoader(dataset=dev_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
@@ -153,7 +155,7 @@ if __name__ == '__main__':
 
         if loss < min_loss:
             min_loss = loss        
-            torch.save(net.state_dict(), 'net.pt')
+            torch.save(net.state_dict(), './saved_model/net.pt')
             print('Saving Model: ', _, '|' ,epoch,"  " ,acc , '  ', loss)
 
             early_stop_cnt = 0
@@ -163,13 +165,18 @@ if __name__ == '__main__':
         if early_stop_cnt > early_stop:
             break        
 
-    dataset = AudioTestDataset('test_padding.pkl')
-    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=0)
+    import matplotlib.pyplot as plt
+    plt.plot(np.arange(len(dev_loss)), dev_loss)
+    plt.show()
 
     del net
+    
     net = Net().to(device)
-    ckpt = torch.load('net.pt', map_location='cpu')  # Load your best model
+    ckpt = torch.load('./saved_model/net.pt', map_location='cpu')  # Load your best model
     net.load_state_dict(ckpt)
+
+    dataset = AudioTestDataset('./pkl/all_test_padding.pkl')
+    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=0)
 
     alls = 0
     correct = 0
@@ -182,7 +189,3 @@ if __name__ == '__main__':
         if(y_.argmax().item() == y.item()):
             correct += 1
     print(correct / alls)
-
-    import matplotlib.pyplot as plt
-    plt.plot(np.arange(len(dev_loss)), dev_loss)
-    plt.show()

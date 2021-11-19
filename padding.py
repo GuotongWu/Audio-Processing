@@ -6,7 +6,7 @@ from librosa.feature.spectral import mfcc
 from mpl_toolkits.mplot3d import Axes3D
 import os
 
-def padding(audio_data, padding_len=26460):
+def padding(audio_data, padding_len=32500):
     padding_data = []
     for y in audio_data:
         zero_len = (padding_len - len(y)) // 2
@@ -22,8 +22,10 @@ def read_audio(path:str, need_padding=False):
     for item in os.listdir(path):
         person, times, sentence = [int(i) for i in item.split('.')[0].split('-')]
         y, _ = librosa.load(os.path.join(path, item))
+        # print(librosa.feature.mfcc(y).shape)
         pre_data.append(y)
         audio_data['label'].append((sentence, person))
+    # exit()
     if need_padding:   
         pre_data = padding(pre_data)
     for y in pre_data:
@@ -42,8 +44,10 @@ def read_obj(address):
 def draw_feature(audio_data):
     fig = plt.figure() 
     ax = Axes3D(fig)
+
+    num = audio_data['feature'][0].shape[1]
     
-    x, y = np.meshgrid(np.arange(0, 52), np.arange(0, 20))
+    x, y = np.meshgrid(np.arange(0, num), np.arange(0, 20))
 
     ax.scatter3D(x, y, audio_data['feature'][0])
     ax.scatter3D(x, y, audio_data['feature'][1])
@@ -52,9 +56,9 @@ def draw_feature(audio_data):
 
 
 if True:
-    audio_data = read_audio('./test', need_padding=True)
-    save_obj(audio_data, 'test_padding')
-audio_data = read_obj('test_padding.pkl')
+    audio_data = read_audio('./temp/test', need_padding=False)
+    save_obj(audio_data, './pkl/all_test_nopadding')
+audio_data = read_obj('./pkl/all_test_nopadding.pkl')
 print(audio_data['feature'][0].shape)
 print(audio_data['feature'][1].shape)
-draw_feature(audio_data)
+# draw_feature(audio_data)
