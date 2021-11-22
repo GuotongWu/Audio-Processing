@@ -56,9 +56,9 @@ def draw_feature(audio_data):
 
 
 if True:
-    audio_data = read_audio('./temp/test', need_padding=False)
-    save_obj(audio_data, './pkl/all_test_nopadding')
-audio_data = read_obj('./pkl/all_test_nopadding.pkl')
-print(audio_data['feature'][0].shape)
-print(audio_data['feature'][1].shape)
+    audio_data = read_audio('./test', need_padding=True)
+    save_obj(audio_data, './pkl/all_test_padding_yyc')
+# audio_data = read_obj('./pkl/all_test_padding.pkl')
+# print(audio_data['feature'][0].shape)
+# print(audio_data['feature'][1].shape)
 # draw_feature(audio_data)
