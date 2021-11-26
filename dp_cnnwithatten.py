@@ -1,43 +1,28 @@
+import os
 import pickle
-import random
+import torchaudio
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn.modules.normalization import LayerNorm
 from torch.utils.data import Dataset, DataLoader
+from argumentation import SoundDS
 
 class AudioDataset(Dataset):
-    def __init__(self, pkl_path, type, shuffle_indices) -> None:
-        self.type = type
-        with open(pkl_path, 'rb') as f:
-            data = pickle.load(f)
-
-        if type == 'train':
-            indices = shuffle_indices[:len(shuffle_indices)//10*8]
-        else:
-            indices = shuffle_indices[len(shuffle_indices)//10*8:]
-
-        self.raw_x = torch.FloatTensor(data['feature'])[indices]
-        self.raw_y = torch.LongTensor(data['label'])[indices]
+    def __init__(self, data_dir, sr=44100) -> None:
+        self.data_dir = data_dir
+        self.files = os.listdir(self.data_dir)
+        self.sr = sr
             
     def __len__(self):
-        return len(self.raw_x)
+        return len(self.files)
         
     def __getitem__(self, idx):
-        return self.raw_x[idx].unsqueeze(dim=0), self.raw_y[idx][0]
-
-class AudioTestDataset(Dataset):
-    def __init__(self, pkl_path) -> None:
-        with open(pkl_path, 'rb') as f:
-            data = pickle.load(f)
-        self.raw_x = data['feature']
-        self.raw_y = data['label']
-
-    def __len__(self):
-        return len(self.raw_x)
-        
-    def __getitem__(self, idx):
-        return torch.from_numpy(self.raw_x[idx]).unsqueeze(dim=0).to(torch.float32), torch.tensor(self.raw_y[idx][0]).to(torch.long)
+        sig, sr = torchaudio.load(os.path.join(self.data_dir, self.files[idx]))
+        sig = torchaudio.transforms.Resample(sr, self.sr)(sig.mean(dim=0))
+        sig = torchaudio.transforms.MFCC(self.sr, n_mfcc=26, melkwargs={"n_fft": 2048, "hop_length": 512, "power": 2})(sig)
+        order_id = int(self.files[idx][:-4].split('-')[2])
+        user_id = int(self.files[idx][:-4].split('-')[0])
+        return sig.mean(dim=-1).unsqueeze(dim=1), order_id, user_id
 
 class Transpose(nn.Module):
     def __init__(self, dim0, dim1):
@@ -51,52 +36,26 @@ class Transpose(nn.Module):
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        # (1, 40, 32)
-        self.Conv0 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, stride=1, padding=1)
-        self.BatchNorm0 = nn.BatchNorm2d(num_features=8)
-        self.ReLU0 = nn.ReLU()
-        self.Pooling0 = nn.MaxPool2d(kernel_size=2, stride=2)  # (8, 20, 16)
+        # (1, 26)
+        self.BatchNorm = nn.BatchNorm1d(num_features=26)
+        self.Flatten = nn.Flatten(start_dim=1, end_dim=-1)
+        self.FC0 = nn.Linear(in_features=26, out_features=256)
+        self.GELU_0 = nn.GELU()
 
-        self.Conv1 = nn.Conv2d(in_channels=8, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.BatchNorm1 = nn.BatchNorm2d(num_features=32)
-        self.ReLU1 = nn.ReLU()
-        self.Pooling1 = nn.MaxPool2d(kernel_size=2, stride=2)  # (32, 10, 8)
+        # self.FC1 = nn.Linear(in_features=256, out_features=64)
+        # self.GELU_1 = nn.GELU()
 
-        self.Flatten0 = nn.Flatten(start_dim=2, end_dim=-1) # (32, 80)
-
-        self.transpose = Transpose(-2, -1)
-        # (80, 32)
-
-        self.Transformer = nn.TransformerEncoder(nn.TransformerEncoderLayer(32, 4), 12, nn.LayerNorm(32))
-        self.Flatten1 = nn.Flatten(start_dim=1, end_dim=-1)
-
-
-        self.FC0 = nn.Linear(in_features=32*10*8, out_features=256)
-        self.ReLU_0 = nn.ReLU()
-
-        self.FC1 = nn.Linear(in_features=256, out_features=64)
-        self.ReLU_1 = nn.ReLU()
-
-        self.FC2 = nn.Linear(in_features=64, out_features=9)
-        self.Softmax = nn.Softmax()
+        self.FC2 = nn.Linear(in_features=256, out_features=9)
+        self.Softmax = nn.Softmax(dim=-1)
 
         self.Sequence = nn.Sequential(
-            self.Conv0,
-            self.BatchNorm0,
-            self.ReLU0,
-            self.Pooling0,
-            self.Conv1,
-            self.BatchNorm1,
-            self.ReLU1,
-            self.Pooling1,
-            self.Flatten0,
-            self.transpose,
-            self.Transformer,
-            self.Flatten1,
+            self.BatchNorm,
+            # self.Transformer,
+            self.Flatten,
             self.FC0,
-            self.ReLU_0,
-            self.FC1,
-            self.ReLU_1,
+            self.GELU_0,
+            # self.FC1,
+            # self.GELU_1,
             self.FC2,
             self.Softmax
         )
@@ -104,7 +63,7 @@ class Net(nn.Module):
         self.lossfunc = torch.nn.CrossEntropyLoss()
 
     def forward(self, x:torch.Tensor):
-        x = x.reshape((-1, 1, 40, 32))
+        # x = x.reshape((-1, 1, 40, 32))
         return self.Sequence(x)
 
     def cal_loss(self, pred, y, regulation_lambda):
@@ -118,22 +77,21 @@ def dev(dev_loader, net, device, regulation_lambda):
     total_loss = 0
     total_acc = 0
 
-    for x, y in dev_loader:
+    for x, y, z in dev_loader:
         x, y = x.to(device), y.to(device)
         with torch.no_grad():
             pred = net(x)
             loss = net.cal_loss(pred, y, regulation_lambda).item()
             total_loss += loss * len(x)
             total_acc += (pred.argmax(dim=1) == y).to(torch.float32).mean().item() * len(x)
-
     return  total_loss/len(dev_loader.dataset), total_acc/len(dev_loader.dataset)
 
 if __name__ == '__main__':
     device = 0
     lr = 0.0001
     epoch = 5000
-    batch_size = 128
-    regulation_lambda = 0.01
+    batch_size = 1024
+    regulation_lambda = 0.0000
     early_stop = 100
 
     
@@ -141,15 +99,15 @@ if __name__ == '__main__':
 
     optimiser = torch.optim.Adam(net.parameters(), lr=lr) 
 
-    shuffle_indices = indices = np.arange(441)
-    np.random.shuffle(indices)
 
-    train_dataset = AudioDataset('./pkl/all_train_padding.pkl', 'train', shuffle_indices)
-    dev_dataset = AudioDataset('./pkl/all_train_padding.pkl', 'dev', shuffle_indices)
+    train_dataset = AudioDataset('src')
+    # train_dataset = AudioDataset('./pkl/all_train_padding.pkl', 'train', shuffle_indices)
+    # dev_dataset = AudioDataset('./pkl/all_train_padding.pkl', 'dev', shuffle_indices)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-    dev_loader = DataLoader(dataset=dev_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    # dev_loader = DataLoader(dataset=dev_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
-    test_dataset = AudioTestDataset('./pkl/all_test_padding.pkl')
+    test_dataset = AudioDataset('test')
+    # test_dataset = AudioTestDataset('./pkl/all_test_padding.pkl')
     test_loader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False, num_workers=0)
 
     train_loss = []
@@ -158,9 +116,10 @@ if __name__ == '__main__':
     dev_acc = []
     min_loss = 10000
     early_stop_cnt = 0
+    best_acc = 0
 
     for _ in range(epoch):
-        for x, y in train_loader:
+        for x, y, z in train_loader:
             net.train()
             x, y = x.to(device=device), y.to(device=device)
             y_ = net(x)
@@ -177,9 +136,14 @@ if __name__ == '__main__':
         dev_acc.append(acc)
 
         if loss < min_loss:
-            min_loss = loss        
-            torch.save(net.state_dict(), './saved_model/net.pt')
+            min_loss = loss
+            if _ % 10 == 0:        
+                torch.save(net.state_dict(), './saved_model/net_cnn_atten%d.pt' % _)
             print('Saving Model: ', _, '|' ,epoch,"  " ,'acc:',acc , '  ', 'loss:', loss, " ", early_stop_cnt)
+
+            if best_acc <= acc:
+                torch.save(net.state_dict(), './saved_model/net_cnn_atten at %d.pt' % (acc*10000))
+                best_acc = acc
 
             early_stop_cnt = 0
         else:
