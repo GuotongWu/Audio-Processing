@@ -26,7 +26,7 @@ def separate(filename:str, personid:int, sampleid:int):
         # region's metadata can also be used with the `save` method
         # (no need to explicitly specify region's object and `format` arguments)
 
-name = 'ly'
+name = 'yyc'
 for i, item in enumerate(os.listdir(name)):
     print(item)
     separate('%s/%s' % (name, item), person[name], i)

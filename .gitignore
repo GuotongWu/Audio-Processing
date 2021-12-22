@@ -11,7 +11,10 @@ papers
 *.mp3
 
 *.zip
-*.pkl
+# *.pkl
 
 test.py
 test.ipynb
+
+.swift-sfdc.json
+temp
